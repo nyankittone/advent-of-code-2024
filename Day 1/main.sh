@@ -10,8 +10,9 @@
 # -- add that to a sum
 # -- return the sum
 
-# $1 is left input file
-# $2 is right input file
+# $1 is left input string
+# $2 is right input string
+# $3 is the input line size
 get_answer() {
     local returned
     returned=0
