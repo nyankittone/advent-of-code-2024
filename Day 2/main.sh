@@ -24,14 +24,11 @@ recover_unsafe() {
 # Output is what the value of $direction in validate_report() should be, and an extra line to signal skipping
 # iteration
 validate_level() {
-    echo -E "prev: $1" "curr: $2" 1>&2
-
     local difference
     difference=$(($1 - $2))
 
     [ "$difference" -gt 3 ] || [ "$difference" -lt -3 ] || [ "$difference" = 0 ] && {
         echo -E "$4"
-        echo -E "go"
         return 1
     }
 
@@ -41,12 +38,10 @@ validate_level() {
         *) capture="$(validate_direction "$4" down)";;
     esac || {
         echo -E "$capture"
-        echo -E "go"
         return 1
     }
 
     echo -E "$capture"
-    echo -E "go"
 }
 
 # $1 is the report (a line of text with numbers)
@@ -67,18 +62,24 @@ validate_report() {
     remaining=$(echo -E "$1" | sed -E 's/^\s*[0-9]+\s+[0-9]+\s*//')
 
     local direction
+    local skip_loop
     direction=idk
 
     for next_token in $remaining; do
-        echo direction is "$direction" 1>&2
+        [ -n "$skip_loop" ] && continue
+
         local capture
         capture=$(validate_level "$previous_token" "$current_token" "$next_token" "$direction")
         if [ "$?" != 0 ]; then
-            echo Rats! 1>&2
             return 1
         fi
 
         direction=$(echo -E "$capture" | head -n1)
+
+        if [ "$(echo -E "$capture" | tail -n1)" = 'skip' ]; then
+            skip_loop=yes
+        fi
+
         previous_token="$current_token"
         current_token="$next_token"
     done
@@ -90,8 +91,7 @@ validate_report() {
     esac
     validate_level "$previous_token" "$current_token" "$fake_token" "$direction" 1>/dev/null || return 1
 
-    echo OK! 1>&2
-    return 0
+    echo -E s"$1"
 }
 
 load_file() {
@@ -106,5 +106,7 @@ load_file() {
 
 load_file "$1" | while read -r line; do
     validate_report "$line" && echo -E "$line"
-done | wc -l | xargs -I % echo % reports are safe.
+done
+
+# load_file "$1" | xargs -I {} validate_report {}
 
