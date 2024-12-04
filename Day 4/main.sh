@@ -7,9 +7,9 @@
 # If I can somehow get away with this, I can get by by just using `grep -o` to get occurrences of
 # "XMAS", and get how many for each transform with `wc -l`. Sum it up, and I might have an answer.
 
-# For some reason, this program outputs the wrong answer on the full data set... I don't understand
-# why; there's no good lead I have for why this happens, but sad. I must fix this or restart with
-# just an array...
+# I've learned the hard way that using `grep -oc` to get all occurrences for XMAS doesn't actually
+# work... you must do `grep -o` and then pipe out to `wc -l`. Either way, it works now.
+# Thank you to u/AllanTaylor314 and others for helping me diagnose that problem out! <3
 
 log() {
     echo "$@" 1>&2
@@ -67,7 +67,7 @@ do_the_thing() {
     local final_sum
     local sum
 
-    sum=$(echo -E "$1" | grep -oc XMAS || true)
+    sum=$(echo -E "$1" | grep -o XMAS | wc -l || true)
     printf 'no transform: %s\n' "$sum"
     final_sum=$((final_sum + sum))
 
