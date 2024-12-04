@@ -17,7 +17,7 @@ log() {
 
 load_file() {
     if [ -n "$1" ]; then
-        cat -- "$1"
+        cat -- "$1" || kill -9 "$$"
     else
         cat
     fi
@@ -67,46 +67,46 @@ do_the_thing() {
     local final_sum
     local sum
 
-    sum=$(echo -E "$1" | grep -oc XMAS)
+    sum=$(echo -E "$1" | grep -oc XMAS || true)
     printf 'no transform: %s\n' "$sum"
     final_sum=$((final_sum + sum))
 
     local transd
     transd=$(echo -E "$1" | rev)
-    sum=$(echo -E "$transd" | grep -oc XMAS)
+    sum=$(echo -E "$transd" | grep -o XMAS | wc -l || true)
     printf 'mirrored: %s\n' "$sum"
     final_sum=$((final_sum + sum))
 
     transd=$(rotate "$1")
-    sum=$(echo -E "$transd" | grep -oc XMAS)
+    sum=$(echo -E "$transd" | grep -o XMAS | wc -l || true)
     printf 'rotated: %s\n' "$sum"
     final_sum=$((final_sum + sum))
 
     transd=$(echo -E "$transd" | rev)
-    sum=$(echo -E "$transd" | grep -oc XMAS)
+    sum=$(echo -E "$transd" | grep -o XMAS | wc -l || true)
     printf 'rotated + mirrored: %s\n' "$sum"
     final_sum=$((final_sum + sum))
 
     # now i gotta do the diagonals lmao
     # SLANT_LEFT
     transd=$(rotate "$(slant_left "$1")")
-    sum=$(echo -E "$transd" | grep -oc XMAS)
+    sum=$(echo -E "$transd" | grep -o XMAS | wc -l || true)
     printf 'left slant + rotated: %s\n' "$sum"
     final_sum=$((final_sum + sum))
 
     transd=$(echo -E "$transd" | rev)
-    sum=$(echo -E "$transd" | grep -oc XMAS)
+    sum=$(echo -E "$transd" | grep -o XMAS | wc -l || true)
     printf 'left slant + rotated + mirrored: %s\n' "$sum"
     final_sum=$((final_sum + sum))
 
     # SLANT_RIGHT
     transd=$(rotate "$(slant_right "$1")")
-    sum=$(echo -E "$transd" | grep -oc XMAS)
+    sum=$(echo -E "$transd" | grep -o XMAS | wc -l || true)
     printf 'right slant + rotated: %s\n' "$sum"
     final_sum=$((final_sum + sum))
 
     transd=$(echo -E "$transd" | rev)
-    sum=$(echo -E "$transd" | grep -oc XMAS)
+    sum=$(echo -E "$transd" | grep -o XMAS | wc -l || true)
     printf 'right slant + rotated + mirrored: %s\n' "$sum"
     final_sum=$((final_sum + sum))
 
