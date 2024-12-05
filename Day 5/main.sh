@@ -18,12 +18,22 @@ load_file() {
     fi
 }
 
+# $3 is the ordering rules.
 # Is $1 supposed to occur before $2?
 # If true, return 0, else 1.
 # If we don't know, also return 0.
 # I have some performance concerns with this code.
 is_before() {
-    grep '^'"$1"'|'"$2"'$' || grep '^'"$2"'|'"$1"'$' && return 1
+    # echo -E "$1 before $2?"
+    if (echo -E "$3" | grep '^'"$1"'|'"$2"'$' >/dev/null); then
+        # echo -E YES
+        return 0
+    elif (echo -E "$3" | grep '^'"$2"'|'"$1"'$' >/dev/null); then
+        # echo -E NO
+        return 1
+    fi
+
+    # echo -E WHEN YOU
     return 0
 }
 
@@ -32,35 +42,22 @@ is_before() {
 # stdout is the input with all the bad inputs filtered out
 filter_bad_lists() {
     while true; do
-        # WHY IS READ GIVING A BAD EXIT CODE ON THE SECOND LOOP???? BLEHHH
-        echo new loop 1>&2
-        local bruh
-        read -r bruh
-        echo -E "$bruh"  1>&2
-
         local fields
-        IFS=, read -ra fields <<< "$bruh"
+        IFS=, read -ra fields || break
 
         local continue_flag
+        continue_flag=
         local i
         i=0
 
         while [ "$i" -lt "${#fields[@]}" ]; do
             local ii
-            ii=0
+            ii=$((i + 1))
 
             while [ "$ii" -lt "${#fields[@]}" ]; do
-                if [ "$ii" -eq "$i" ]; then
-                    ii=$((ii + 1))
-                elif [ "$ii" -lt "$i" ]; then
+                if [ "$ii" -gt "$i" ]; then
                     # do thing or something
-                    if ! is_before "${fields[$ii]}" "${fields[$i]}"; then
-                        continue_flag=yes
-                        break
-                    fi
-                else
-                    # do similar but other thing or somthn, what am I, a programmer?
-                    if ! is_before "${fields[$i]}" "${fields[$ii]}"; then
+                    if ! is_before "${fields[$i]}" "${fields[$ii]}" "$1"; then
                         continue_flag=yes
                         break
                     fi
@@ -91,5 +88,7 @@ page_lists=$(echo -E "$full_input" | tail -n"$((line_count - split_point - 1))")
 unset -v line_count
 unset -v split_point
 
-echo -E "$page_lists" | filter_bad_lists "$ordering_rules"
+echo -E "$page_lists" | filter_bad_lists "$ordering_rules" | awk '{print $(NF/2+1)}' |
+    tr '\n' ' ' | sed 's/ $//;s/ / + /g' | xargs -d ' ' expr
+# echo -E "$page_lists" | test_function
 
