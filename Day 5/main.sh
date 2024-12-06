@@ -37,11 +37,63 @@ is_before() {
     return 0
 }
 
+# $1 is the ordering rules
+# all other arguments are for the passed in array
+try_fix() {
+    local i
+    i=0
+
+    local rules
+    rules=$1
+    shift
+
+    local array
+    array=("$@")
+
+    local continue_flag
+
+    while [ "$i" -lt "${#array[@]}" ]; do
+        local ii
+        ii=$((i + 1))
+
+        while [ "$ii" -lt "${#array[@]}" ]; do
+            if ! is_before "${array[$i]}" "${array[$ii]}" "$rules"; then
+                local tmp
+                tmp=${array[i]}
+                array[i]=${array[ii]}
+                array[ii]=$tmp
+
+                i=0
+                ii=1
+                continue_flag=yes
+                break
+            fi
+
+            ii=$((ii + 1))
+        done
+
+        if [ -n "$continue_flag" ]; then
+            continue_flag=
+            continue
+        fi
+
+        i=$((i + 1))
+    done
+
+    echo -E "${array[@]}"
+}
+
 # stdin is the lists of pages
 # $1 is the ordering rules
 # stdout is the input with all the bad inputs filtered out
 filter_bad_lists() {
+    local another_effing_counter
+    another_effing_counter=1
+
     while true; do
+        echo -E "loop $another_effing_counter" 1>&2
+        another_effing_counter=$((another_effing_counter + 1))
+
         local fields
         IFS=, read -ra fields || break
 
@@ -55,12 +107,11 @@ filter_bad_lists() {
             ii=$((i + 1))
 
             while [ "$ii" -lt "${#fields[@]}" ]; do
-                if [ "$ii" -gt "$i" ]; then
-                    # do thing or something
-                    if ! is_before "${fields[$i]}" "${fields[$ii]}" "$1"; then
-                        continue_flag=yes
-                        break
-                    fi
+                if ! is_before "${fields[$i]}" "${fields[$ii]}" "$1"; then
+                    # swap the offending elements and try again lmao
+                    try_fix "$1" "${fields[@]}"
+                    continue_flag=yes
+                    break
                 fi
 
                 ii=$((ii + 1))
@@ -71,7 +122,6 @@ filter_bad_lists() {
         done
 
         [ -n "$continue_flag" ] && continue
-        echo -E "${fields[@]}"
     done
 }
 
