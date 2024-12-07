@@ -25,43 +25,158 @@ init_guard() {
     echo 'guard_move=move_up'
 }
 
+# $1 is the column to use
+# $2 is the low coord
+# $3 is the high coord
+modmap_vert() {
+    # Modify the OG map with X's in the right places
+    local column
+    column=$(sed "$2,$3"'s/.*/X/' <<< "$1")
+    map="$(paste <(cut -c1-$((guard_x - 1)) <<< "$map") <(echo -E "$column") <(cut -c$((guard_x + 1))- <<< "$map") | tr -d '\t')"
+}
+
 # $1 is the input map
 # stdout is a new output map with the X's in the right places
 # 1 is returned if the guard runs into the map edge.
 move_up() {
+    echo up
     # cut the map to the current column
     local column
     local column_info
-    column=$(cut -c "$guard_x" <<< "$1")
+    local old_guard_y
+    old_guard_y=$guard_y
+    column=$(cut -c "$guard_x" <<< "$map")
     column_info=$(grep -n '#' <<< "$column")
     if [ "$?" != 0 ]; then
         guard_y=1
+        modmap_vert "$column" "$guard_y" "$old_guard_y"
         return 1
     fi
 
     # Find the largest Y value less than or greater to guard_y
-    local old_guard_y
-    old_guard_y=$guard_y
-    guard_y=$(cut -d: -f1 <<< "$column_info" | awk '{if($0 < '"$guard_y"') {result=$0} else exit} END{print result}')
+    guard_y=$(cut -d: -f1 <<< "$column_info" | awk 'BEGIN{result=-1} {if($0 < '"$guard_y"') {result=$0} else exit} END{print result}')
+    if [ "$guard_y" -le 0 ]; then
+        guard_y=1
+        modmap_vert "$column" "$guard_y" "$old_guard_y"
+        return 1
+    fi
+
     guard_y=$((guard_y + 1))
 
     # Modify the OG map with X's in the right places
-    column=$(sed "$guard_y,$old_guard_y"'s/.*/X/' <<< "$column")
-    map="$(paste <(cut -c1-$((guard_x - 1)) <<< "$1") <(echo -E "$column") <(cut -c$((guard_x + 1))- <<< "$1") | tr -d '\t')"
+    modmap_vert "$column" "$guard_y" "$old_guard_y"
 
     guard_move=move_right
-    echo -E "y is $guard_y" 1>&2
+    return 0
+}
+
+# $1 is the line to splice in
+# $2 is low coord
+# $3 is high coord
+modmap_horiz() {
+    local line
+    line=$(cut -c-"$(($2 - 1))" <<< "$1" || echo -n)$(awk 'BEGIN{s = sprintf("%*s", '"$(($3 - $2 + 1))"', ""); gsub(".", "X", s); print s; exit}')$(cut -c"$(($3 + 1))"- <<< "$1")
+    map=$(cat <(head -n"$((guard_y - 1))" <<< "$map") - <(tail -n"$(($(wc -l <<< "$map") - guard_y))" <<< "$map") <<< "$line")
+}
+
+# stdout is a new output map with the X's in the right places
+# 1 is returned if the guard runs into the map edge.
+move_right() {
+    echo right
+    # Get line for the guard's Y position
+    local line
+    local line_info
+    local old_guard_x
+    old_guard_x=$guard_x
+    line=$(sed "$guard_y"'p;d' <<< "$map")
+    line_info=$(grep -bo '#' <<< "$line")
+    if [ "$?" != 0 ]; then
+        guard_x=$(wc -L <<< "$line")
+        modmap_horiz "$line" "$old_guard_x" "$guard_x"
+        return 1
+    fi
+
+    # Find the smallest X value greater than or equal to guard_x
+    guard_x=$(cut -d: -f1 <<< "$line_info" | awk '{if($0 >= '"$guard_x"') {print; exit}}')
+    if [ -z "$guard_x" ]; then # I hope this is right lmao
+        guard_x=$(wc -L <<< "$line")
+        modmap_horiz "$line" "$old_guard_x" "$guard_x"
+        return 1
+    fi
+
+    # Modify the OG map with X's in the right places
+    modmap_horiz "$line" "$old_guard_x" "$guard_x"
+
+    guard_move=move_down
     return 0
 }
 
 # $1 is the input map
 # stdout is a new output map with the X's in the right places
 # 1 is returned if the guard runs into the map edge.
-move_right() {
+move_down() {
+    echo down
+    # cut the map to the current column
+    local column
+    local column_info
+    local old_guard_y
+    old_guard_y=$guard_y
+    column=$(cut -c "$guard_x" <<< "$map")
+    column_info=$(grep -n '#' <<< "$column")
+    # if [ "$?" != 0 ]; then
+    #     guard_y=$(wc -l <<< "$map")
+    #     modmap_vert "$column" "$old_guard_y" "$guard_y"
+    #     return 1
+    # fi
+
+    # Find the largest Y value less than or greater to guard_y
+    guard_y=$(cut -d: -f1 <<< "$column_info" | awk '{if($0 > '"$guard_y"') {print; exit}}')
+    guard_y=$((guard_y - 1))
+    if [ "$guard_y" -le 0 ]; then
+        guard_y=$(wc -l <<< "$map")
+        modmap_vert "$column" "$old_guard_y" "$guard_y"
+        return 1
+    fi
+
+    # Modify the OG map with X's in the right places
+    modmap_vert "$column" "$old_guard_y" "$guard_y"
+
+    guard_move=move_left
+    return 0
+}
+
+# stdout is a new output map with the X's in the right places
+# 1 is returned if the guard runs into the map edge.
+move_left() {
+    echo left
     # Get line for the guard's Y position
     local line
+    local line_info
+    local old_guard_x
+    old_guard_x=$guard_x
+    line=$(sed "$guard_y"'p;d' <<< "$map")
+    line_info=$(grep -bo '#' <<< "$line")
+    # if [ "$?" != 0 ]; then
+    #     guard_x=$(wc -L <<< "$line")
+    #     modmap_horiz "$line" "$guard_x" "$old_guard_x"
+    #     return 1
+    # fi
 
-    guard_move=move_down
+    # Find the smallest X value greater than or equal to guard_x
+    guard_x=$(cut -d: -f1 <<< "$line_info" | awk '{if(($0 + 1) < '"$guard_x"') {result=$0} else exit} END{print result}')
+    echo "$guard_x"
+    if [ -z "$guard_x" ]; then
+        guard_x=1
+        modmap_horiz "$line" "$guard_x" "$old_guard_x"
+        return 1
+    fi
+
+    guard_x=$((guard_x + 2))
+
+    # Modify the OG map with X's in the right places
+    modmap_horiz "$line" "$guard_x" "$old_guard_x"
+
+    guard_move=move_up
     return 0
 }
 
@@ -78,8 +193,10 @@ set -e
 
 map=$(load_file "$1")
 eval `init_guard "$map"`
-echo "$guard_y"
-"$guard_move" "$map"
+
+while "$guard_move"; do echo "$map"; echo; done
+echo GUARD HAS EXITED THE FACILITY
+
 echo "$map"
-echo -E "y is $guard_y" 1>&2
-echo "$guard_move"
+printf 'There are %s X'"'"'s.\n' "$(grep -o X <<< "$map" | wc -l)"
+
